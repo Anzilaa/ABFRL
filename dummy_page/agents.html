@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stylist Agent — Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .sim {max-width:900px;margin:18px auto;padding:18px;background:#fff;border:1px solid #eee}
+    .controls{display:flex;gap:12px;flex-wrap:wrap}
+    .log{height:380px;overflow:auto;background:#fafafa;padding:12px;border-radius:6px;border:1px solid #eee}
+    .step{margin:8px 0;padding:8px;border-radius:6px;background:#f5f7fb}
+    label{display:block;margin:6px 0}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Agent Simulator</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="flow.html">Flowchart</a>
+      <a href="products.html">Products</a>
+    </nav>
+  </header>
+
+  <main class="sim">
+    <section>
+      <h2>Start a Session</h2>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <label>Channel
+            <select id="channel"><option>Website</option><option>Mobile App</option><option>WhatsApp</option></select>
+          </label>
+          <label>Occasion
+            <input id="occasion" placeholder="e.g., Birthday, Party, Work" />
+          </label>
+          <label>Budget (₹)
+            <input id="budget" type="number" placeholder="2000" />
+          </label>
+          <label>Preference
+            <input id="preference" placeholder="e.g., Casual, Formal, Sustainable" />
+          </label>
+        </div>
+
+        <div style="min-width:220px">
+          <button id="start">Start Session</button>
+          <button id="auto">Auto-run</button>
+          <button id="reset">Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <section>
+      <h3>Agent Log</h3>
+      <div id="log" class="log" role="log" aria-live="polite"></div>
+    </section>
+
+    <hr>
+
+    <section>
+      <h3>Controls</h3>
+      <div class="controls">
+        <button id="next" disabled>Next Step</button>
+        <button id="simulate-arrival" disabled>Simulate In-Store Arrival</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Simple client-side simulator for the 0-10 steps in the flow provided.
+    const logEl = id('log');
+    const startBtn = id('start');
+    const nextBtn = id('next');
+    const autoBtn = id('auto');
+    const resetBtn = id('reset');
+    const arriveBtn = id('simulate-arrival');
+
+    let state = {step:0, session:{} , selected:null, upsellOffered:false};
+    let auto = false;
+
+    startBtn.addEventListener('click', ()=>{
+      state = {step:0, session:{channel:val('channel'),occasion:val('occasion'),budget:val('budget'),preference:val('preference')}, selected:null, upsellOffered:false};
+      clearLog();
+      append('Session started on ' + state.session.channel);
+      step0();
+      nextBtn.disabled = false;
+      arriveBtn.disabled = true;
+    });
+
+    nextBtn.addEventListener('click', ()=>{ runNext(); });
+    autoBtn.addEventListener('click', ()=>{ auto = !auto; autoBtn.textContent = auto? 'Stop Auto':'Auto-run'; if(auto) runNext(); });
+    resetBtn.addEventListener('click', ()=>{ state={step:0,session:{},selected:null,upsellOffered:false}; clearLog(); nextBtn.disabled=true; arriveBtn.disabled=true; auto=false; autoBtn.textContent='Auto-run'; });
+    arriveBtn.addEventListener('click', ()=>{ append('Customer arrived in-store — kiosk recognizes session'); step8_storeContinuity(); });
+
+    function runNext(){
+      switch(state.step){
+        case 0: step1_recommendation(); break;
+        case 1: step2_inventoryCheck(); break;
+        case 2: step3_fulfillmentPreview(); break;
+        case 3: step4_softUpsell(); break;
+        case 4: step5_loyalty(); break;
+        case 5: step6_payment(); break;
+        case 6: step7_fulfillmentExecution(); break;
+        case 7: step8_storeContinuity(); break;
+        case 8: step9_postPurchase(); break;
+        case 9: step10_omnichannel(); break;
+        default: append('Flow complete.'); nextBtn.disabled=true; return;
+      }
+      state.step += 1;
+      if(auto){ setTimeout(()=>runNext(),700); }
+    }
+
+    // Step 0 - Master Sales Agent greeting & intent capture
+    function step0(){
+      appendAgent('Sales Agent', `Hi — welcome! I can help find something for ${state.session.occasion || 'any occasion'}. What's your budget?`);
+      appendUser(`Budget: ₹${state.session.budget || '—'}; Preference: ${state.session.preference || '—'}`);
+      // ready to move to recommendation
+    }
+
+    // Step 1 - Recommendation
+    function step1_recommendation(){
+      appendAgent('Recommendation Agent', 'Finding 1 main product and 1–2 complementary items (no pressure)');
+      // pick a product from products.json (if available)
+      fetch('data/products.json').then(r=>r.json()).then(products=>{
+        // naive selection: choose product within budget or random
+        let budget = parseFloat(state.session.budget) || Infinity;
+        let candidates = products.filter(p=>p.price <= budget);
+        if(candidates.length===0) candidates = products;
+        const main = candidates[Math.floor(Math.random()*candidates.length)];
+        const complements = products.filter(p=>p.id!==main.id).slice(0,2);
+        state.selected = {main,complements};
+        append('Recommendation:');
+        appendItem(main);
+        complements.forEach(c=>appendItem(c,'complement'));
+        append('No payment requested yet — presenting options.');
+        if(!auto){};
+      });
+    }
+
+    // Step 2 - Inventory
+    function step2_inventoryCheck(){
+      appendAgent('Inventory Agent', 'Checking availability across nearby stores and warehouse');
+      // mock availability check (random)
+      const avail = Math.random() > 0.25; // 75% available
+      setTimeout(()=>{
+        if(avail){ append('Inventory: Available in nearby stores and warehouse'); }
+        else{
+          append('Inventory: Not available. Asking Recommendation Agent for alternatives');
+          // minimal alternative: pick another product
+          fetch('data/products.json').then(r=>r.json()).then(products=>{
+            const alt = products.find(p=>p.id!==state.selected.main.id);
+            append('Suggested alternative:'); appendItem(alt);
+            state.selected.main = alt;
+          });
+        }
+      },400);
+    }
+
+    // Step 3 - Fulfillment preview
+    function step3_fulfillmentPreview(){
+      appendAgent('Fulfillment Agent', 'Showing pickup or delivery options before payment');
+      // mock slots and delivery
+      const pickupStore = 'Central Mall — 10:30-11:30';
+      const deliveryETA = '2 business days — ₹99';
+      append(`Pickup: ${pickupStore}`);
+      append(`Delivery: ${deliveryETA}`);
+    }
+
+    // Step 4 - Soft Upsell (once)
+    function step4_softUpsell(){
+      if(state.upsellOffered){ append('Upsell already offered and skipped previously — skipping'); return; }
+      appendAgent('Upsell Agent', 'Optional: Would you like a matching accessory? (1–2 suggestions)');
+      // show one complement as upsell
+      const ups = state.selected && state.selected.complements && state.selected.complements[0];
+      if(ups){ appendItem(ups,'upsell'); }
+      // provide controls to accept/decline in log via simple prompt (simulate)
+      const accept = Math.random() > 0.6; // 40% accept rate
+      if(accept){ append('Customer accepted upsell — added to basket'); state.upsellOffered = true; }
+      else{ append('Customer declined upsell — will not be shown again'); state.upsellOffered = true; }
+    }
+
+    // Step 5 - Loyalty & Offers
+    function step5_loyalty(){
+      appendAgent('Loyalty Agent', 'Checking coupons and reward points');
+      // mock savings
+      const coupon = Math.random() > 0.5 ? 'WELCOME10' : null;
+      const pointsUsed = Math.random() > 0.7 ? 150 : 0;
+      append(`Coupon: ${coupon || 'none'}`);
+      append(`Reward points applied: ₹${pointsUsed}`);
+    }
+
+    // Step 6 - Payment
+    function step6_payment(){
+      appendAgent('Payment Agent', 'Presenting payment options: UPI, Card, Gift Card, Reward Points, Pay-in-store');
+      append('No upsell during payment.');
+      // simulate a payment success
+      const success = true;
+      setTimeout(()=>{
+        if(success){ append('Payment successful — transaction ID: TX' + Date.now()); }
+        else{ append('Payment failed — offer retry'); }
+      },400);
+    }
+
+    // Step 7 - Fulfillment Execution
+    function step7_fulfillmentExecution(){
+      appendAgent('Fulfillment Agent', 'Locking delivery slot or generating pickup token');
+      // mock
+      const pickup = Math.random()>0.5;
+      if(pickup){ append('Pickup token generated — QR: PICK' + Math.floor(Math.random()*90000+10000)); arriveBtn.disabled=false; }
+      else{ append('Delivery scheduled — courier will contact you'); }
+    }
+
+    // Step 8 - In-store continuity (if pickup)
+    function step8_storeContinuity(){
+      appendAgent('Kiosk Agent', 'Recognizes session and directs customer to counter/room');
+      append('Kiosk: Displaying order and scanning pickup QR');
+      append('Order confirmed in-store');
+    }
+
+    // Step 9 - Post-purchase
+    function step9_postPurchase(){
+      appendAgent('Post-Purchase Agent', 'Sending receipt (WhatsApp), tracking info, and feedback link');
+      append('Receipt sent via WhatsApp');
+      append('Order tracking enabled');
+    }
+
+    // Step 10 - Omnichannel continuity
+    function step10_omnichannel(){
+      appendAgent('Master Agent', 'Session persisted — user can resume across Website / Kiosk / WhatsApp without repeating steps');
+      append('Flow complete.'); nextBtn.disabled=true; arriveBtn.disabled=true;
+    }
+
+    // Utilities
+    function append(msg){ const d=document.createElement('div'); d.className='step'; d.textContent = msg; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight; }
+    function appendAgent(name,msg){ append(`${name}: ${msg}`); }
+    function appendUser(msg){ append(`User: ${msg}`); }
+    function appendItem(p,t='main'){ const d=document.createElement('div'); d.className='step'; d.innerHTML = `<strong>${t.toUpperCase()}:</strong> ${p.name} — ₹${p.price.toFixed(2)}<div style="font-size:13px;color:#555">${p.description}</div>`; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight; }
+    function id(i){return document.getElementById(i)}
+    function val(i){return id(i).value}
+    function clearLog(){ logEl.innerHTML=''; }
+
+    // hint for integrators: replace mock functions with actual GADK/GPT calls
+    // Example: call server endpoint: fetch('/api/gadk', {method:'POST', body:JSON.stringify({agent:'recommendation',context})})
+
+  </script>
+</body>
+</html>

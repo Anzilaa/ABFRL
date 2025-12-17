@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stylist Agent — Products</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Products</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Products</a>
+      <a href="cart.html">Cart (<span id="cart-count">0</span>)</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="products" class="grid"></section>
+  </main>
+
+  <template id="product-template">
+    <article class="product">
+      <img class="thumb" src="" alt="">
+      <h4 class="name"></h4>
+      <p class="desc"></p>
+      <div class="meta">
+        <strong class="price"></strong>
+        <button class="add">Add to cart</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
