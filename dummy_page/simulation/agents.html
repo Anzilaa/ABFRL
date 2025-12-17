@@ -15,7 +15,7 @@
 </head>
 <body>
   <header>
-    <h1>Agent Simulator</h1>
+    <h1>Agent Simulator — Conversational Demo</h1>
     <nav>
       <a href="index.html">Home</a>
       <a href="flow.html">Flowchart</a>
@@ -85,7 +85,7 @@
       state = {step:0, session:{channel:val('channel'),occasion:val('occasion'),budget:val('budget'),preference:val('preference')}, selected:null, upsellOffered:false};
       clearLog();
       append('Session started on ' + state.session.channel);
-      step0();
+        step0();
       nextBtn.disabled = false;
       arriveBtn.disabled = true;
     });
@@ -115,14 +115,14 @@
 
     // Step 0 - Master Sales Agent greeting & intent capture
     function step0(){
-      appendAgent('Sales Agent', `Hi — welcome! I can help find something for ${state.session.occasion || 'any occasion'}. What's your budget?`);
-      appendUser(`Budget: ₹${state.session.budget || '—'}; Preference: ${state.session.preference || '—'}`);
+      appendAgent('Sales Agent', `Hi there! I can help you find something for ${state.session.occasion || 'any occasion'}. What's your budget and any style preference?`);
+      appendUser(`Thanks — noted budget: ₹${state.session.budget || '—'}; Preference: ${state.session.preference || '—'}`);
       // ready to move to recommendation
     }
 
     // Step 1 - Recommendation
     function step1_recommendation(){
-      appendAgent('Recommendation Agent', 'Finding 1 main product and 1–2 complementary items (no pressure)');
+      appendAgent('Recommendation Agent', 'Okay — Ill find a main item and a couple of complementary pieces. No pressure, just suggestions.');
       // pick a product from products.json (if available)
       fetch('data/products.json').then(r=>r.json()).then(products=>{
         // naive selection: choose product within budget or random
@@ -132,23 +132,23 @@
         const main = candidates[Math.floor(Math.random()*candidates.length)];
         const complements = products.filter(p=>p.id!==main.id).slice(0,2);
         state.selected = {main,complements};
-        append('Recommendation:');
+        append('Here are a few suggestions:');
         appendItem(main);
         complements.forEach(c=>appendItem(c,'complement'));
-        append('No payment requested yet — presenting options.');
+        append('Take a look — no payment yet. Let me know if you want to proceed.');
         if(!auto){};
       });
     }
 
     // Step 2 - Inventory
     function step2_inventoryCheck(){
-      appendAgent('Inventory Agent', 'Checking availability across nearby stores and warehouse');
+      appendAgent('Inventory Agent', 'Im checking stock at nearby stores and the warehouse now.');
       // mock availability check (random)
       const avail = Math.random() > 0.25; // 75% available
       setTimeout(()=>{
         if(avail){ append('Inventory: Available in nearby stores and warehouse'); }
         else{
-          append('Inventory: Not available. Asking Recommendation Agent for alternatives');
+          append('Hmm — that item isnt available right now. Ill suggest a close alternative.');
           // minimal alternative: pick another product
           fetch('data/products.json').then(r=>r.json()).then(products=>{
             const alt = products.find(p=>p.id!==state.selected.main.id);
@@ -161,7 +161,7 @@
 
     // Step 3 - Fulfillment preview
     function step3_fulfillmentPreview(){
-      appendAgent('Fulfillment Agent', 'Showing pickup or delivery options before payment');
+      appendAgent('Fulfillment Agent', 'Here are pickup and delivery options — you can choose before payment.');
       // mock slots and delivery
       const pickupStore = 'Central Mall — 10:30-11:30';
       const deliveryETA = '2 business days — ₹99';
@@ -171,8 +171,8 @@
 
     // Step 4 - Soft Upsell (once)
     function step4_softUpsell(){
-      if(state.upsellOffered){ append('Upsell already offered and skipped previously — skipping'); return; }
-      appendAgent('Upsell Agent', 'Optional: Would you like a matching accessory? (1–2 suggestions)');
+      if(state.upsellOffered){ append('Already offered an extra — skipping further suggestions'); return; }
+      appendAgent('Upsell Agent', 'Optional: Would you like a matching accessory? Heres one suggestion.');
       // show one complement as upsell
       const ups = state.selected && state.selected.complements && state.selected.complements[0];
       if(ups){ appendItem(ups,'upsell'); }
@@ -184,7 +184,7 @@
 
     // Step 5 - Loyalty & Offers
     function step5_loyalty(){
-      appendAgent('Loyalty Agent', 'Checking coupons and reward points');
+      appendAgent('Loyalty Agent', 'Let me check for coupons or reward points you can use.');
       // mock savings
       const coupon = Math.random() > 0.5 ? 'WELCOME10' : null;
       const pointsUsed = Math.random() > 0.7 ? 150 : 0;
@@ -194,43 +194,43 @@
 
     // Step 6 - Payment
     function step6_payment(){
-      appendAgent('Payment Agent', 'Presenting payment options: UPI, Card, Gift Card, Reward Points, Pay-in-store');
-      append('No upsell during payment.');
+      appendAgent('Payment Agent', 'Here are the payment options: UPI, Card, Gift Card, Reward Points, or Pay-in-store.');
+      append('Processing payment...');
       // simulate a payment success
       const success = true;
       setTimeout(()=>{
-        if(success){ append('Payment successful — transaction ID: TX' + Date.now()); }
-        else{ append('Payment failed — offer retry'); }
+        if(success){ append('Great — payment went through. Transaction ID: TX' + Date.now()); }
+        else{ append('Payment failed — please try again or choose another method'); }
       },400);
     }
 
     // Step 7 - Fulfillment Execution
     function step7_fulfillmentExecution(){
-      appendAgent('Fulfillment Agent', 'Locking delivery slot or generating pickup token');
+      appendAgent('Fulfillment Agent', 'Im locking the delivery slot or generating your pickup token now.');
       // mock
       const pickup = Math.random()>0.5;
-      if(pickup){ append('Pickup token generated — QR: PICK' + Math.floor(Math.random()*90000+10000)); arriveBtn.disabled=false; }
-      else{ append('Delivery scheduled — courier will contact you'); }
+      if(pickup){ append('Pickup token created — QR: PICK' + Math.floor(Math.random()*90000+10000)); arriveBtn.disabled=false; }
+      else{ append('Delivery scheduled — the courier will contact you'); }
     }
 
     // Step 8 - In-store continuity (if pickup)
     function step8_storeContinuity(){
-      appendAgent('Kiosk Agent', 'Recognizes session and directs customer to counter/room');
-      append('Kiosk: Displaying order and scanning pickup QR');
+      appendAgent('Kiosk Agent', 'Kiosk recognized your session — directing you to the pickup counter.');
+      append('Kiosk: Showing order details and scanning pickup QR');
       append('Order confirmed in-store');
     }
 
     // Step 9 - Post-purchase
     function step9_postPurchase(){
-      appendAgent('Post-Purchase Agent', 'Sending receipt (WhatsApp), tracking info, and feedback link');
+      appendAgent('Post-Purchase Agent', 'Ill send a receipt and tracking details, and share a quick feedback link.');
       append('Receipt sent via WhatsApp');
-      append('Order tracking enabled');
+      append('Order tracking is now enabled');
     }
 
     // Step 10 - Omnichannel continuity
     function step10_omnichannel(){
-      appendAgent('Master Agent', 'Session persisted — user can resume across Website / Kiosk / WhatsApp without repeating steps');
-      append('Flow complete.'); nextBtn.disabled=true; arriveBtn.disabled=true;
+      appendAgent('Master Agent', 'All set — your session is saved. You can pick this up on Website, Kiosk, or WhatsApp without repeating anything.');
+      append('Thats it — session complete.'); nextBtn.disabled=true; arriveBtn.disabled=true;
     }
 
     // Utilities

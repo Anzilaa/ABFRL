@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stylist Agent — Chat</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .chat { max-width:800px;margin:24px auto;padding:12px;border:1px solid #ddd;border-radius:8px }
+    .msgs { height:360px; overflow:auto; border:1px solid #eee; padding:8px; background:#fafafa }
+    .msg { margin:8px 0 }
+    .user { text-align:right }
+    .bot { text-align:left }
+    .rec { padding:8px;border:1px solid #ddd;margin:6px 0 }
+    .controls { display:flex; gap:8px; margin-top:8px }
+    .controls input { flex:1 }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Chat with Stylist Agent</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Products</a>
+      <a href="cart.html">Cart (<span id="cart-count">0</span>)</a>
+      <a href="chat.html">Chat</a>
+    </nav>
+  </header>
+  <main>
+    <div class="chat">
+      <div id="msgs" class="msgs"></div>
+      <div class="controls">
+        <input id="input" placeholder="Type 'recommend' or 'buy <productId>' or 'checkout'" />
+        <button id="send">Send</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const msgs = document.getElementById('msgs');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+
+    function addMsg(text, cls='bot'){
+      const d = document.createElement('div'); d.className = 'msg '+cls; d.innerHTML = text; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    async function chatSend(message, extra={}){
+      addMsg(message, 'user');
+      try{
+        const res = await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(Object.assign({userId:'demo-user', message}, extra))});
+        const j = await res.json();
+        if(j.recommendations){
+          addMsg(j.reply, 'bot');
+          j.recommendations.forEach(p=>{
+            const el = document.createElement('div'); el.className = 'rec';
+            el.innerHTML = `<strong>${p.name}</strong> — ₹${(p.price||0).toFixed(2)}<br>${p.description || ''}<br><button data-id="${p.id}">Buy</button>`;
+            el.querySelector('button').addEventListener('click', ()=>{
+              chatSend('buy '+p.id);
+            });
+            msgs.appendChild(el);
+          });
+        } else if(j.payment){
+          addMsg(j.reply + '<br>Transaction: ' + (j.payment.transaction_id||j.payment.transactionId || ''), 'bot');
+        } else if(j.shipment){
+          addMsg('Shipment created: ' + (j.shipment.shipment_id || j.shipment.shipmentId || ''), 'bot');
+        } else if(j.reply){
+          addMsg(j.reply, 'bot');
+        } else {
+          addMsg(JSON.stringify(j), 'bot');
+        }
+      }catch(e){
+        addMsg('Error sending message', 'bot');
+      }
+    }
+
+    send.addEventListener('click', ()=>{ const v = input.value.trim(); if(!v) return; chatSend(v); input.value=''; input.focus(); });
+    input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ send.click(); } });
+
+    // intro
+    addMsg('Hi — ask me to "recommend" products or type "buy <productId>" to purchase.', 'bot');
+  </script>
+</body>
+</html>

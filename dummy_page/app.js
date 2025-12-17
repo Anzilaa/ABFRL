@@ -29,6 +29,18 @@ function renderProducts(){
   const container = document.getElementById('products');
   if(!container) return;
   fetchProducts().then(products=>{
+    // fetch recommendations from backend if available
+    fetch('/api/recommendations')
+      .then(r=>r.json())
+      .then(data=>{
+        if(data && data.results && data.results.length){
+          const recRoot = document.getElementById('recommendations');
+          if(recRoot){
+            recRoot.innerHTML = '<h3>Recommended for you</h3>' + data.results.map(p=>`<div class="rec">${p.name} — ₹${p.price.toFixed(2)}</div>`).join('');
+          }
+        }
+      }).catch(()=>{});
+
     const tpl = document.getElementById('product-template');
     products.forEach(p=>{
       const node = tpl.content.cloneNode(true);
