@@ -11,19 +11,20 @@ Call `setup_google_api_key()` early in your program.
 
 import os
 from typing import Optional
-from dotenv import load_dotenv
 
 
 def setup_google_api_key(env_var: str = "GOOGLE_API_KEY",
                          dotenv_path: Optional[str] = None,
-                         use_vertexai: bool = False,
-                         prompt: bool = True) -> None:
+                         use_vertexai: bool = False) -> None:
     """Configure `GOOGLE_API_KEY` for local use.
 
-    Resolution order:
+    Resolution order (non-interactive):
     1. Existing environment variable
-    2. `.env` file (if `python-dotenv` is available and `dotenv_path` is provided or discoverable)
-    3. Interactive prompt (if `prompt=True` and input is available)
+    2. `.env` file (loaded via python-dotenv if available and discoverable)
+
+    This function will NOT prompt interactively. If the key is not found
+    it raises a RuntimeError so calling scripts fail-fast and CI remains
+    non-interactive.
 
     Side effects:
     - sets `os.environ['GOOGLE_API_KEY']`
@@ -31,39 +32,56 @@ def setup_google_api_key(env_var: str = "GOOGLE_API_KEY",
     """
     api_key = os.environ.get(env_var)
 
-    if not api_key and dotenv_path is not None:
+    # Attempt to load from dotenv if not present in environment
+    if not api_key:
         try:
-            from dotenv import load_dotenv, find_dotenv
+            from dotenv import load_dotenv, find_dotenv  # type: ignore
             path = dotenv_path or find_dotenv()
             if path:
                 load_dotenv(path)
                 api_key = os.environ.get(env_var)
         except Exception:
+            # dotenv not available or load failed — fall through
+            api_key = os.environ.get(env_var)
+
+    # If python-dotenv isn't available or didn't find the file, try a manual
+    # fallback: look for a .env file at the repository root (one level up
+    # from this `agents` package) and parse it for the key. This avoids
+    # depending on an external package and works when `.env` sits outside
+    # the `agents/` folder.
+    if not api_key:
+        try:
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            env_file = os.path.join(repo_root, ".env")
+            if os.path.exists(env_file):
+                with open(env_file, "r", encoding="utf-8") as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"\'')
+                        if k == env_var:
+                            api_key = v
+                            os.environ[k] = v
+                            break
+        except Exception:
+            # best-effort only — fall through to other checks
             pass
 
-    if not api_key and dotenv_path is None:
-        # try to auto-discover a .env in the project
-        try:
-            from dotenv import load_dotenv, find_dotenv
-            path = find_dotenv()
-            if path:
-                load_dotenv(path)
-                api_key = os.environ.get(env_var)
-        except Exception:
-            pass
-
-    if not api_key and prompt:
-        try:
-            val = input("Enter your GOOGLE_API_KEY (leave empty to cancel): ").strip()
-            if val:
-                api_key = val
-        except Exception:
-            pass
+    # Also accept common alternate env names for convenience (e.g. API, API_KEY)
+    if not api_key:
+        for alt in ("API", "API_KEY"):
+            alt_val = os.environ.get(alt)
+            if alt_val:
+                api_key = alt_val
+                break
 
     if not api_key:
         raise RuntimeError(
-            "Google API key not found. Set the environment variable 'GOOGLE_API_KEY', "
-            "create a .env file with GOOGLE_API_KEY=..., or provide it interactively."
+            "Google API key not found. Set one of the environment variables '" + env_var + "', "
+            "'API' or 'API_KEY', or create a .env file with one of those keys in the project root."
         )
 
     os.environ[env_var] = api_key

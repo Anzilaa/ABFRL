@@ -5,3 +5,5 @@ install:
 .venv
 google-adk
 python-dotenv
+ipython 
+jupyter-server
